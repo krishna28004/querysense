@@ -1,9 +1,4 @@
-import { OpenAI } from "openai";
 import { Issue, PerformanceMetrics } from "./types";
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || "mock-key",
-});
 
 interface AIAnalysisResult {
   optimized_query: string;
@@ -17,7 +12,8 @@ export async function runAIAnalysis(
   ruleIssues: Issue[],
   schema?: string
 ): Promise<AIAnalysisResult> {
-  const isMockMode = !process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === "mock-key";
+  const geminiApiKey = process.env.GEMINI_API_KEY || "mock-key";
+  const isMockMode = !process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === "mock-key";
 
   if (isMockMode) {
     // Return high quality mock responses based on standard sample queries to make the offline demo work perfectly
@@ -61,24 +57,99 @@ ${sql}
 
 ${schema ? `Here is the related CREATE TABLE schema context for reference:\n\`\`\`sql\n${schema}\n\`\`\`` : ""}`;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.1,
-    });
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: userPrompt }],
+            },
+          ],
+          systemInstruction: {
+            parts: [{ text: systemPrompt }],
+          },
+          generationConfig: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: "OBJECT",
+              properties: {
+                optimized_query: { type: "STRING" },
+                issues: {
+                  type: "ARRAY",
+                  items: {
+                    type: "OBJECT",
+                    properties: {
+                      category: { type: "STRING" },
+                      severity: { type: "STRING", enum: ["critical", "warning", "info"] },
+                      title: { type: "STRING" },
+                      description: { type: "STRING" },
+                      suggestion: { type: "STRING" },
+                      confidence: { type: "NUMBER" },
+                      line: { type: "INTEGER" }
+                    },
+                    required: ["category", "severity", "title", "description", "suggestion", "confidence"]
+                  }
+                },
+                metrics: {
+                  type: "OBJECT",
+                  properties: {
+                    estimated_rows_scanned: {
+                      type: "OBJECT",
+                      properties: {
+                        before: { type: "NUMBER" },
+                        after: { type: "NUMBER" }
+                      },
+                      required: ["before", "after"]
+                    },
+                    estimated_time_ms: {
+                      type: "OBJECT",
+                      properties: {
+                        before: { type: "NUMBER" },
+                        after: { type: "NUMBER" }
+                      },
+                      required: ["before", "after"]
+                    },
+                    complexity_score: {
+                      type: "OBJECT",
+                      properties: {
+                        before: { type: "NUMBER" },
+                        after: { type: "NUMBER" }
+                      },
+                      required: ["before", "after"]
+                    }
+                  },
+                  required: ["estimated_rows_scanned", "estimated_time_ms", "complexity_score"]
+                },
+                explanation: { type: "STRING" }
+              },
+              required: ["optimized_query", "issues", "metrics", "explanation"]
+            },
+            temperature: 0.1,
+          },
+        }),
+      }
+    );
 
-    const content = response.choices[0]?.message?.content;
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Gemini API error (${response.status}): ${errText}`);
+    }
+
+    const data = await response.json();
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!content) {
-      throw new Error("Empty response from OpenAI");
+      throw new Error("Empty response from Gemini API");
     }
 
     return JSON.parse(content) as AIAnalysisResult;
   } catch (error) {
-    console.error("OpenAI API error:", error);
+    console.error("Gemini API error:", error);
     // Fall back to rule-based metrics and dynamic fallback optimized query
     return getFallbackAnalysis(sql, ruleIssues);
   }
