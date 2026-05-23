@@ -1,0 +1,22 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model QueryAnalysis {
+  id             String   @id @default(cuid())
+  originalQuery  String   @map("original_query")
+  optimizedQuery String?  @map("optimized_query")
+  score          Float    @default(0)
+  severity       String   @default("info")
+  issues         String   @default("[]")
+  metrics        String   @default("{}")
+  explanation    String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@map("query_analyses")
+}

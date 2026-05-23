@@ -1,0 +1,69 @@
+import { Issue, PerformanceMetrics, AnalysisResponse } from "./types";
+import { calculateScore } from "./scorer";
+
+export function mergeResults(
+  sql: string,
+  ruleIssues: Issue[],
+  aiIssues: Omit<Issue, "id" | "source">[],
+  optimizedQuery: string,
+  metrics: PerformanceMetrics,
+  explanation: string
+): AnalysisResponse {
+  const mergedIssues: Issue[] = [...ruleIssues];
+
+  // Merge AI-detected issues while avoiding duplicates
+  for (const aiIssue of aiIssues) {
+    const isDuplicate = ruleIssues.some(
+      (rule) =>
+        rule.category === aiIssue.category &&
+        (rule.line === aiIssue.line || (!rule.line && !aiIssue.line))
+    );
+
+    if (!isDuplicate) {
+      mergedIssues.push({
+        ...aiIssue,
+        id: `ai-${aiIssue.category}-${Math.random().toString(36).substr(2, 5)}`,
+        source: "ai",
+      });
+    }
+  }
+
+  // Sort issues: critical first, then warning, then info
+  const severityOrder = { critical: 0, warning: 1, info: 2 };
+  mergedIssues.sort((a, b) => {
+    return (severityOrder[a.severity] ?? 3) - (severityOrder[b.severity] ?? 3);
+  });
+
+  const { score, severity } = calculateScore(mergedIssues);
+  const avgConfidence = mergedIssues.length
+    ? mergedIssues.reduce((sum, issue) => sum + issue.confidence, 0) / mergedIssues.length
+    : 1;
+  const hasRule = mergedIssues.some((issue) => issue.source === "rule");
+  const hasAI = mergedIssues.some((issue) => issue.source === "ai");
+  const detectedBy = hasRule && hasAI ? "Hybrid" : hasAI ? "AI" : "Rule Engine";
+
+  // If score is 100 but there's optimized query changes, maybe keep it 100.
+  // Clamping score and ensuring consistency.
+
+  return {
+    id: `analysis-${Math.random().toString(36).substr(2, 9)}`,
+    score,
+    severity,
+    original_query: sql,
+    optimized_query: optimizedQuery || sql,
+    issues: mergedIssues,
+    metrics,
+    explanation,
+    metadata: {
+      confidence: Number(avgConfidence.toFixed(2)),
+      reasoning_source: "Rule engine + AI semantic analysis",
+      execution_timestamp: new Date().toISOString(),
+      detected_by: detectedBy,
+      why_this_suggestion:
+        "Suggestions prioritize high-cost scan reductions, join simplification, and safer query limits to improve throughput under scale.",
+    },
+    ai_disclaimer:
+      "Estimated performance only. Validate with EXPLAIN ANALYZE on production-like data.",
+    analyzed_at: new Date().toISOString(),
+  };
+}
