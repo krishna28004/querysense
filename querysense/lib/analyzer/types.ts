@@ -26,6 +26,11 @@ export interface PerformanceMetrics {
     before: number;
     after: number;
   };
+  cpu_reduction_pct?: number;
+  monthly_db_cost_estimate?: {
+    before: number;
+    after: number;
+  };
 }
 
 export interface AnalysisResponse {
@@ -43,6 +48,8 @@ export interface AnalysisResponse {
     execution_timestamp: string;
     detected_by: "Rule Engine" | "AI" | "Hybrid";
     why_this_suggestion: string;
+    optimization_confidence?: number;
+    recommendation_badge?: "SAFE TO APPLY" | "REVIEW" | "HIGH RISK";
   };
   ai_disclaimer?: string;
   analyzed_at: string;

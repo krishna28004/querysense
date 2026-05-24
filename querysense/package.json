@@ -9,11 +9,11 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@google/genai": "^2.6.0",
     "@monaco-editor/react": "^4.7.0",
     "@prisma/client": "^5.22.0",
     "framer-motion": "^12.40.0",
     "next": "16.2.6",
-    "openai": "^6.39.0",
     "prisma": "^5.22.0",
     "react": "19.2.4",
     "react-diff-viewer-continued": "^4.2.2",

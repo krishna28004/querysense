@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     // 1. Run deterministic rule-based checks
     const ruleIssues = runRuleEngine(sql);
 
-    // 2. Call OpenAI analyzer (with fallback to mock responses or dynamic heuristics if offline/error)
+    // 2. Call Google Gemini analyzer (with fallback to mock responses or dynamic heuristics if offline/error)
     const aiResult = await runAIAnalysis(sql, ruleIssues, schema);
 
     // 3. Merge, deduplicate, score, and format

@@ -1,3 +1,4 @@
+import { GoogleGenAI, Type } from '@google/genai';
 import { Issue, PerformanceMetrics } from "./types";
 
 interface AIAnalysisResult {
@@ -12,13 +13,15 @@ export async function runAIAnalysis(
   ruleIssues: Issue[],
   schema?: string
 ): Promise<AIAnalysisResult> {
-  const geminiApiKey = process.env.GEMINI_API_KEY || "mock-key";
-  const isMockMode = !process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === "mock-key";
+  const googleApiKey = process.env.GOOGLE_API_KEY || "mock-key";
+  const isMockMode = !process.env.GOOGLE_API_KEY || process.env.GOOGLE_API_KEY === "mock-key";
 
   if (isMockMode) {
     // Return high quality mock responses based on standard sample queries to make the offline demo work perfectly
     return getMockAnalysis(sql, ruleIssues);
   }
+
+  const ai = new GoogleGenAI({ apiKey: googleApiKey });
 
   try {
     const systemPrompt = `You are QuerySense, a world-class SQL Performance Tuning Specialist and PostgreSQL Database Administrator.
@@ -38,6 +41,8 @@ Your analysis must include:
    - "estimated_rows_scanned": { "before": number, "after": number }
    - "estimated_time_ms": { "before": number, "after": number }
    - "complexity_score": { "before": number, "after": number } (0-10 scale)
+   - "cpu_reduction_pct": number (0-100)
+   - "monthly_db_cost_estimate": { "before": number, "after": number } (in USD)
 4. "explanation": A 2-3 sentence friendly summary of what you optimized and why it makes a massive difference.
 
 CRITICAL:
@@ -57,99 +62,102 @@ ${sql}
 
 ${schema ? `Here is the related CREATE TABLE schema context for reference:\n\`\`\`sql\n${schema}\n\`\`\`` : ""}`;
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: "user",
-              parts: [{ text: userPrompt }],
-            },
-          ],
-          systemInstruction: {
-            parts: [{ text: systemPrompt }],
-          },
-          generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: "OBJECT",
-              properties: {
-                optimized_query: { type: "STRING" },
-                issues: {
-                  type: "ARRAY",
-                  items: {
-                    type: "OBJECT",
+    const executeRequest = async () => {
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Gemini API timeout (15000ms)")), 15000)
+      );
+
+      const responsePromise = ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: userPrompt,
+        config: {
+          systemInstruction: systemPrompt,
+          temperature: 0.1,
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              optimized_query: { type: Type.STRING },
+              issues: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    category: { type: Type.STRING },
+                    severity: { type: Type.STRING, enum: ["critical", "warning", "info"] },
+                    title: { type: Type.STRING },
+                    description: { type: Type.STRING },
+                    suggestion: { type: Type.STRING },
+                    confidence: { type: Type.NUMBER },
+                    line: { type: Type.INTEGER }
+                  },
+                  required: ["category", "severity", "title", "description", "suggestion", "confidence"]
+                }
+              },
+              metrics: {
+                type: Type.OBJECT,
+                properties: {
+                  estimated_rows_scanned: {
+                    type: Type.OBJECT,
                     properties: {
-                      category: { type: "STRING" },
-                      severity: { type: "STRING", enum: ["critical", "warning", "info"] },
-                      title: { type: "STRING" },
-                      description: { type: "STRING" },
-                      suggestion: { type: "STRING" },
-                      confidence: { type: "NUMBER" },
-                      line: { type: "INTEGER" }
+                      before: { type: Type.NUMBER },
+                      after: { type: Type.NUMBER }
                     },
-                    required: ["category", "severity", "title", "description", "suggestion", "confidence"]
+                    required: ["before", "after"]
+                  },
+                  estimated_time_ms: {
+                    type: Type.OBJECT,
+                    properties: {
+                      before: { type: Type.NUMBER },
+                      after: { type: Type.NUMBER }
+                    },
+                    required: ["before", "after"]
+                  },
+                  complexity_score: {
+                    type: Type.OBJECT,
+                    properties: {
+                      before: { type: Type.NUMBER },
+                      after: { type: Type.NUMBER }
+                    },
+                    required: ["before", "after"]
+                  },
+                  cpu_reduction_pct: { type: Type.NUMBER },
+                  monthly_db_cost_estimate: {
+                    type: Type.OBJECT,
+                    properties: {
+                      before: { type: Type.NUMBER },
+                      after: { type: Type.NUMBER }
+                    },
+                    required: ["before", "after"]
                   }
                 },
-                metrics: {
-                  type: "OBJECT",
-                  properties: {
-                    estimated_rows_scanned: {
-                      type: "OBJECT",
-                      properties: {
-                        before: { type: "NUMBER" },
-                        after: { type: "NUMBER" }
-                      },
-                      required: ["before", "after"]
-                    },
-                    estimated_time_ms: {
-                      type: "OBJECT",
-                      properties: {
-                        before: { type: "NUMBER" },
-                        after: { type: "NUMBER" }
-                      },
-                      required: ["before", "after"]
-                    },
-                    complexity_score: {
-                      type: "OBJECT",
-                      properties: {
-                        before: { type: "NUMBER" },
-                        after: { type: "NUMBER" }
-                      },
-                      required: ["before", "after"]
-                    }
-                  },
-                  required: ["estimated_rows_scanned", "estimated_time_ms", "complexity_score"]
-                },
-                explanation: { type: "STRING" }
+                required: ["estimated_rows_scanned", "estimated_time_ms", "complexity_score", "cpu_reduction_pct", "monthly_db_cost_estimate"]
               },
-              required: ["optimized_query", "issues", "metrics", "explanation"]
+              explanation: { type: Type.STRING }
             },
-            temperature: 0.1,
-          },
-        }),
+            required: ["optimized_query", "issues", "metrics", "explanation"]
+          }
+        }
+      });
+
+      const response = await Promise.race([responsePromise, timeoutPromise]);
+      const content = response.text;
+      
+      if (!content) {
+        throw new Error("Empty response from Gemini API");
       }
-    );
 
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Gemini API error (${response.status}): ${errText}`);
+      return JSON.parse(content) as AIAnalysisResult;
+    };
+
+    try {
+      return await executeRequest();
+    } catch (initialError) {
+      console.warn("Gemini API first attempt failed, retrying once...", initialError);
+      return await executeRequest();
     }
-
-    const data = await response.json();
-    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!content) {
-      throw new Error("Empty response from Gemini API");
-    }
-
-    return JSON.parse(content) as AIAnalysisResult;
   } catch (error) {
-    console.error("Gemini API error:", error);
+    console.error("Gemini API error after retry:", error);
     // Fall back to rule-based metrics and dynamic fallback optimized query
     return getFallbackAnalysis(sql, ruleIssues);
   }
@@ -193,6 +201,8 @@ LIMIT 50;`,
         estimated_rows_scanned: { before: 12400000, after: 50 },
         estimated_time_ms: { before: 4200, after: 12 },
         complexity_score: { before: 9, after: 3 },
+        cpu_reduction_pct: 95,
+        monthly_db_cost_estimate: { before: 450, after: 10 }
       },
       explanation: "Optimized the implicit Cartesian joins into explicit INNER JOINs and added pagination (LIMIT 50). By adding index suggestions on your foreign keys and filter columns, we reduce rows scanned from 12.4 million to just 50, slashing execution time by 99%.",
     };
@@ -232,6 +242,8 @@ LIMIT 100;`,
         estimated_rows_scanned: { before: 850000, after: 100 },
         estimated_time_ms: { before: 8500, after: 45 },
         complexity_score: { before: 8, after: 4 },
+        cpu_reduction_pct: 88,
+        monthly_db_cost_estimate: { before: 200, after: 15 }
       },
       explanation: "Consolidated the N+1 correlated subqueries into a single LEFT JOIN with aggregate functions (COUNT, MAX). This allows PostgreSQL to utilize a HashAggregate execution plan, satisfying all statistics in one scan instead of running thousands of loop iterations.",
     };
@@ -261,6 +273,8 @@ ORDER BY avg_salary DESC;`,
         estimated_rows_scanned: { before: 210000, after: 120 },
         estimated_time_ms: { before: 2100, after: 85 },
         complexity_score: { before: 7, after: 3 },
+        cpu_reduction_pct: 65,
+        monthly_db_cost_estimate: { before: 150, after: 45 }
       },
       explanation: "Replaced correlated aggregations with GROUP BY and standard aggregations. The FILTER clause enables conditional counting inside the single scan, avoiding multiple scans of the employee table.",
     };
@@ -303,6 +317,8 @@ function getFallbackAnalysis(sql: string, ruleIssues: Issue[]): AIAnalysisResult
       estimated_rows_scanned: { before: beforeRows, after: afterRows },
       estimated_time_ms: { before: 350, after: 15 },
       complexity_score: { before: 6, after: 3 },
+      cpu_reduction_pct: 45,
+      monthly_db_cost_estimate: { before: 60, after: 20 }
     },
     explanation: "Analyzed query structure. Standardized formatting and verified logical layout. Appended a protective LIMIT clause to prevent unbounded memory usage if standard filtering is missing.",
   };
