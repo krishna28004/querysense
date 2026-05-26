@@ -28,5 +28,5 @@ Developers write inefficient SQL queries that lead to slow APIs, high DB costs, 
 4. Setup database: `npx prisma db push`
 5. Start dev server: `npm run dev`
 
-## 🏆 Hackathon Project
-Built in under 24 hours. Optimized for speed, developer experience, and actionable insights.
+## 🏆 Deployed Project
+https://querysense-ampk-gndgzoe7p-krishna28004s-projects.vercel.app/
