@@ -50,7 +50,6 @@ export default function HomePage() {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResponse | null>(null);
   const [copied, setCopied] = useState(false);
   const [timelineStep, setTimelineStep] = useState(0);
-  const [showArchitectureModal, setShowArchitectureModal] = useState(false);
 
   // Load sample query into editor
   const handleSampleClick = (sample: SampleQuery) => {
@@ -154,9 +153,6 @@ export default function HomePage() {
               <div className="inline-flex items-center gap-2 mb-1">
                 <Badge variant="success" dot size="sm">
                   Zero-Config Optimizer
-                </Badge>
-                <Badge variant="info" size="sm">
-                  Hackathon Mode
                 </Badge>
               </div>
               <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
@@ -312,7 +308,7 @@ export default function HomePage() {
             <motion.div variants={itemVariants} className="space-y-3">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-semibold text-[var(--qs-text-muted)] uppercase tracking-wider font-mono">
-                  Load Hackathon Demo Sample SQL
+                  Load Demo Sample SQL
                 </span>
                 <div className="flex-1 h-px bg-[var(--qs-border)]" />
               </div>
@@ -517,92 +513,64 @@ export default function HomePage() {
             </AnimatePresence>
 
             <motion.div variants={itemVariants} className="space-y-4">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-[var(--qs-text-muted)] uppercase tracking-wider font-mono">
-                  Hackathon Evaluation Boost
-                </span>
-                <div className="flex-1 h-px bg-[var(--qs-border)]" />
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-[var(--qs-text-muted)] uppercase tracking-wider font-mono">
+                    WHY QUERYSENSE?
+                  </span>
+                  <div className="flex-1 h-px bg-[var(--qs-border)]" />
+                </div>
+                <p className="text-sm text-[var(--qs-text-secondary)] pl-1">
+                  Visual SQL Intelligence for Modern Development Workflows
+                </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <Card variant="default" padding="md" className="space-y-2">
-                  <p className="text-[10px] uppercase tracking-wider text-[var(--qs-text-muted)] font-mono">Problem</p>
+                  <p className="text-[10px] uppercase tracking-wider text-[var(--qs-text-muted)] font-mono">Performance Risks Hide in Plain Sight</p>
                   <p className="text-sm text-[var(--qs-text-secondary)]">
-                    Teams ship SQL that works in dev, then breaks under scale with hidden scans, unsafe joins, and exploding latency.
+                    SQL queries often perform well during development but become expensive as data grows. QuerySense identifies structural performance risks before deployment.
                   </p>
                 </Card>
 
                 <Card variant="default" padding="md" className="space-y-2">
-                  <p className="text-[10px] uppercase tracking-wider text-[var(--qs-text-muted)] font-mono">How it works</p>
+                  <p className="text-[10px] uppercase tracking-wider text-[var(--qs-text-muted)] font-mono">QueryVision™</p>
                   <p className="text-sm text-[var(--qs-text-secondary)]">
-                    QuerySense fuses deterministic SQL rules with AI reasoning, then produces optimization diffs and impact estimates in seconds.
+                    QueryVision transforms SQL analysis into visual insights, helping developers understand bottlenecks, scaling behavior, and optimization opportunities.
                   </p>
                 </Card>
 
                 <Card variant="glass" padding="md" className="space-y-2">
-                  <p className="text-[10px] uppercase tracking-wider text-[var(--qs-text-muted)] font-mono">Innovation</p>
+                  <p className="text-[10px] uppercase tracking-wider text-[var(--qs-text-muted)] font-mono">Rules + AI</p>
                   <p className="text-sm text-[var(--qs-text-secondary)]">
-                    Hybrid scoring with explainability metadata: confidence, reasoning source, detector type, and traceable timestamps.
+                    Deterministic SQL rules provide reliability while AI-assisted reasoning adds context and optimization suggestions.
                   </p>
                 </Card>
 
                 <Card variant="glass" padding="md" className="space-y-2">
-                  <p className="text-[10px] uppercase tracking-wider text-[var(--qs-text-muted)] font-mono">Impact metrics</p>
-                  <p className="text-sm text-[var(--qs-text-secondary)]">Rows reduced up to 99% in demos, latency drops from seconds to milliseconds, complexity cut by 50%+.</p>
+                  <p className="text-[10px] uppercase tracking-wider text-[var(--qs-text-muted)] font-mono">Built for Trust</p>
+                  <p className="text-sm text-[var(--qs-text-secondary)]">
+                    Every recommendation includes confidence, reasoning source, and supporting analysis.
+                  </p>
                 </Card>
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <Card variant="interactive" padding="md" onClick={() => setShowArchitectureModal(true)}>
-                  <p className="text-[10px] uppercase tracking-wider text-[var(--qs-text-muted)] font-mono mb-1">Architecture modal</p>
-                  <p className="text-sm text-[var(--qs-text-secondary)]">Open concise system flow: UI &rarr; API &rarr; Rule Engine + AI &rarr; Merger &rarr; SQLite History.</p>
+                <Card variant="default" padding="md" className="space-y-2">
+                  <p className="text-[10px] uppercase tracking-wider text-[var(--qs-text-muted)] font-mono">Shift Optimization Left</p>
+                  <p className="text-sm text-[var(--qs-text-secondary)]">
+                    Catch query issues during development instead of after deployment. No production database required.
+                  </p>
                 </Card>
-                <Card variant="default" padding="md">
-                  <p className="text-[10px] uppercase tracking-wider text-[var(--qs-text-muted)] font-mono mb-1">Future roadmap</p>
-                  <p className="text-sm text-[var(--qs-text-secondary)]">Dialect packs, query plan ingestion, team workspaces, and CI performance regression gates.</p>
+                
+                <Card variant="default" padding="md" className="space-y-2">
+                  <p className="text-[10px] uppercase tracking-wider text-[var(--qs-text-muted)] font-mono">Future Improvements</p>
+                  <p className="text-sm text-[var(--qs-text-secondary)]">
+                    Multi-dialect SQL support, team workspaces, persistent cloud history, and query benchmarking.
+                  </p>
                 </Card>
               </div>
             </motion.div>
           </motion.div>
         </div>
-
-        <AnimatePresence>
-          {showArchitectureModal && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-              onClick={() => setShowArchitectureModal(false)}
-            >
-              <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 12 }}
-                className="w-full max-w-2xl rounded-[var(--qs-radius-lg)] border border-[var(--qs-border)] bg-[var(--qs-bg-card)] p-5"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base font-bold text-[var(--qs-text-primary)]">Architecture Overview</h3>
-                  <Button variant="ghost" size="sm" onClick={() => setShowArchitectureModal(false)}>Close</Button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-2 text-center">
-                  {[
-                    "UI",
-                    "Analyze API",
-                    "Rule Engine",
-                    "AI Engine",
-                    "Merger + SQLite",
-                  ].map((step) => (
-                    <div key={step} className="rounded-lg border border-[var(--qs-border)] bg-[var(--qs-bg-secondary)] p-2.5 text-xs text-[var(--qs-text-secondary)] font-mono">
-                      {step}
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         <Footer />
       </main>
