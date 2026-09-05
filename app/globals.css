@@ -1,0 +1,190 @@
+@import "tailwindcss";
+
+/* ===== QuerySense Design System ===== */
+
+:root {
+  /* LIGHT MODE */
+  --qs-bg-primary: #F5F8FC;
+  --qs-bg-secondary: #EEF3F8;
+  --qs-bg-card: #FFFFFF;
+  --qs-bg-card-hover: #F8FAFC;
+  --qs-bg-elevated: #FFFFFF;
+
+  --qs-border: #D9E2EC;
+  --qs-border-hover: #CBD5E1;
+  --qs-border-focus: #1268D6;
+
+  --qs-text-primary: #142033;
+  --qs-text-secondary: #52657A;
+  --qs-text-muted: #8492A6;
+
+  --qs-accent: #1268D6;
+  --qs-accent-hover: #105AB8;
+  --qs-accent-glow: rgba(18, 104, 214, 0.15);
+  --qs-accent-subtle: rgba(18, 104, 214, 0.08);
+
+  --qs-cyan: #149DB8;
+  --qs-info: var(--qs-cyan);
+  --qs-info-bg: rgba(20, 157, 184, 0.1);
+
+  --qs-success: #168A62;
+  --qs-success-bg: rgba(22, 138, 98, 0.1);
+  --qs-warning: #A86C00;
+  --qs-warning-bg: rgba(168, 108, 0, 0.1);
+  --qs-error: #C63E4C;
+  --qs-error-bg: rgba(198, 62, 76, 0.1);
+
+  --qs-radius-sm: 4px;
+  --qs-radius-md: 6px;
+  --qs-radius-lg: 8px;
+  --qs-radius-xl: 10px;
+
+  --qs-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --qs-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.05);
+  --qs-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08);
+
+  /* Layout Variables */
+  --qs-sidebar-width: 277px;
+  --qs-header-height: 64px;
+}
+
+.dark {
+  /* DARK MODE */
+  --qs-bg-primary: #060B12;
+  --qs-bg-secondary: #08111D;
+  --qs-bg-card: #0A121E;
+  --qs-bg-card-hover: #132238;
+  --qs-bg-elevated: #0F1A29;
+
+  --qs-border: #1C3047;
+  --qs-border-hover: #2A4A70;
+  --qs-border-focus: #1677FF;
+
+  --qs-text-primary: #F4F7FB;
+  --qs-text-secondary: #A9B8CC;
+  --qs-text-muted: #71839A;
+
+  --qs-accent: #1677FF;
+  --qs-accent-hover: #2F8CFF;
+  --qs-accent-glow: rgba(22, 119, 255, 0.15);
+  --qs-accent-subtle: rgba(22, 119, 255, 0.08);
+  
+  --qs-cyan: #28C7E8;
+  --qs-info: var(--qs-cyan);
+  --qs-info-bg: rgba(40, 199, 232, 0.1);
+
+  --qs-success: #32C48D;
+  --qs-success-bg: rgba(50, 196, 141, 0.1);
+  --qs-warning: #F3B84B;
+  --qs-warning-bg: rgba(243, 184, 75, 0.1);
+  --qs-error: #EF5B68;
+  --qs-error-bg: rgba(239, 91, 104, 0.1);
+
+  --qs-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --qs-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --qs-shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+@theme inline {
+  --color-background: var(--qs-bg-primary);
+  --color-foreground: var(--qs-text-primary);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* ===== Global Resets ===== */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--qs-border) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--qs-border);
+  border-radius: 3px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--qs-border-hover);
+}
+
+::selection {
+  background: var(--qs-accent);
+  color: white;
+}
+
+body {
+  background: var(--qs-bg-primary);
+  color: var(--qs-text-primary);
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ===== Background Effects ===== */
+
+.qs-bg-grid {
+  background-image:
+    linear-gradient(var(--qs-border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--qs-border) 1px, transparent 1px);
+  background-size: 64px 64px;
+  opacity: 0.15; /* Subtle */
+  mask-image: radial-gradient(ellipse at center, black 20%, transparent 80%);
+}
+
+/* Subtle lighthouse beam effect */
+.qs-bg-radial {
+  background-image: radial-gradient(
+    ellipse 80% 60% at 80% 100%,
+    var(--qs-accent-subtle) 0%,
+    transparent 70%
+  );
+}
+
+/* ===== Glass Effects ===== */
+
+.qs-glass {
+  background: var(--qs-bg-card);
+  border: 1px solid var(--qs-border);
+}
+
+/* ===== Animations ===== */
+
+@keyframes qs-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes qs-fade-in-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.qs-animate-fade-in {
+  animation: qs-fade-in 0.3s ease-out forwards;
+}
+
+.qs-animate-fade-in-up {
+  animation: qs-fade-in-up 0.4s ease-out forwards;
+}
+
+/* ===== Utility Classes ===== */
+
+.qs-hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.qs-hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--qs-shadow-md);
+  border-color: var(--qs-border-hover);
+}
