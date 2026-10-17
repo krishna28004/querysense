@@ -1,61 +1,91 @@
-# QuerySense / Lab
+# QuerySense
 
-An evidence-led PostgreSQL query diagnosis workspace built with Next.js 16, React 19, TypeScript, `node-sql-parser`, Zod, and optional Google Gemini. The active app is this directory (`queryPilot/querysense`). The nested `querysense/` directory is a legacy duplicate and should not be used as the deployment root.
+QuerySense is a PostgreSQL query workbench for answering a more useful question than “Can this SQL be rewritten?”: **what is the database actually doing, and what should I test next?**
 
-## What works
+Paste a `SELECT` query to inspect its structure. Add a PostgreSQL JSON execution plan when you have one, and the report can point to the scans, estimates, filters, and I/O behind its findings. You can then edit a candidate query, compare the SQL side by side, and bring back a second plan to evaluate the experiment.
 
-- Parse one PostgreSQL `SELECT` (including supported CTEs) and reject malformed, multi-statement, or mutating input.
-- Surface conservative structural findings such as wildcard projection, cross join, deep offset, and leading-wildcard search.
-- Read pasted PostgreSQL `EXPLAIN (FORMAT JSON)` plans. Distinguish estimated plans from `ANALYZE` plans, display the plan tree, and flag large row-estimate errors, filtered sequential scans, and disk-spilling sorts where their evidence fields exist.
-- Inspect more plan evidence per node, including loops, cost units, filters, index conditions, shared-buffer hits/reads, temp I/O, sort method/space, and hash batches when present in the supplied plan.
-- Import a `pg_stat_statements` CSV locally in the browser and rank query shapes by total time, mean time, call count, or shared block reads. The file is not uploaded or persisted; imported SQL may still contain sensitive text, so sanitize it before loading.
-- Provide an observation, action, and verification step for every finding. Record optional candidate SQL (syntax-checked) and paste a candidate plan to compare measured execution times or estimated planner costs. Export a Markdown report. Explicitly save up to 25 input sets in browser storage; nothing is written to the application database.
-- Optionally request a Gemini review. The server validates structured output, allows at most three hypotheses, and only keeps hypotheses that cite a finding ID. It does not generate SQL rewrites or performance numbers.
+QuerySense never runs your SQL or connects to your database. It also does not promise that a rewrite or index will be faster. The final check belongs in PostgreSQL, with representative data and a result-set comparison.
 
-QuerySense does not execute SQL, connect to a target database, discover existing indexes, prove an index will help, verify that candidate SQL returns the same rows, verify plan provenance, or benchmark rewritten queries. A pasted `EXPLAIN ANALYZE` plan was measured by the user's PostgreSQL instance, not by QuerySense. PostgreSQL planner cost is an estimate in arbitrary units, not elapsed milliseconds.
+## Why this exists
 
-## Local setup
+Advice based only on SQL text can be useful, but it cannot tell you which plan PostgreSQL chose for *your* tables and data. QuerySense keeps those two kinds of evidence separate:
 
-Use Node.js 20.9+ and npm. From this directory:
+- **SQL inspection** finds structural patterns, such as `SELECT *`, a cross join, deep `OFFSET`, or a leading-wildcard search. These are clues, not measured bottlenecks.
+- **Plan inspection** reads a JSON plan you generated in PostgreSQL. It can show the actual access path, row-estimate mismatches, filter counters, buffers, and spill indicators when the plan contains them.
+- **Candidate comparison** puts your original and edited SQL side by side. If you provide both plans, it compares like-for-like metrics; it does not assume the two queries return the same rows.
+
+Each finding links an observation to a suggested next step and a way to check it. The score on the report is a count-weighted structural signal, **not** a speed benchmark or a safety grade.
+
+## Run it locally
+
+You need Node.js 20.9+ and npm. From the repository root:
 
 ```bash
 npm ci
 npm run dev
+```
+
+Open [http://localhost:3000/editor](http://localhost:3000/editor). No database, migration, or API key is required for the core analysis.
+
+To check the project before a change or deployment:
+
+```bash
 npm run typecheck
 npm run lint
 npm test
 npm run build
 ```
 
-No database setup or migration is needed for the current product. The `prisma/` directory and old analyzer components are legacy artifacts. Existing SQLite data is intentionally left intact but is no longer served by public endpoints.
+`npm run build` followed by `npm run start` runs the production build locally.
 
-The workbench is at `/editor`. A worked example is available in the UI, or at `/editor?sample=orders`. The example plan is illustrative; its numbers are fixture data. For a real query, run `EXPLAIN (FORMAT JSON) SELECT ...` in your own PostgreSQL client and paste the JSON. Use `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` only in a safe environment: `ANALYZE` executes the query. Check result equality and production-like data before deploying any rewrite or index.
+## Try a query
+
+1. Click **Load sample query** and **Analyze query**. The button cycles through five examples. The first includes an illustrative plan; its timing and row counts are fixture values, not measurements from your database.
+2. For your own query, run `EXPLAIN (FORMAT JSON)` in a PostgreSQL client and paste the result into **PostgreSQL execution plan**. Use `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` only where it is safe to execute the query—`ANALYZE` really runs it.
+3. Review the report's severity signals, plan metrics, and individual findings. Open a finding's evidence to see why it was raised and how to validate it.
+4. Click **Build optimized draft** to copy your SQL into an editable candidate. This does **not** generate an automatic rewrite. Make a targeted change, check its syntax, and inspect the before/after diff.
+5. If you have a plan for the candidate, paste it into **Candidate experiment** and compare it with the baseline. Check result equality, parameter cases, and performance on representative data before shipping a change.
+
+You can also import a `pg_stat_statements` CSV to rank query shapes by total time, mean time, calls, or shared block reads. That triage happens in the browser; the CSV is not uploaded or saved by QuerySense.
 
 ## Optional AI review
 
-Set `GOOGLE_API_KEY` and a strong `AI_DEMO_CODE` in server environment variables. `GOOGLE_MODEL` defaults to `gemini-2.5-flash`. Both the model key and access code stay server-side; users enter the demo code when opting in. The code is not saved to browser storage. When enabled, supplied SQL, optional schema text, and plan summary are sent to Google. If the provider is unavailable, the deterministic report still renders and AI shows as unavailable. There is no mocked provider response.
-
-The access code and in-process request limits are suitable for a controlled demo on a single server. For a public production deployment with AI enabled, add a durable distributed rate limiter, quotas, abuse monitoring, and a proper identity/billing policy. Otherwise, leave AI unconfigured and use the core deterministic workflow.
-
-## Architecture
+The deterministic report works without AI. To enable the opt-in Gemini review for a controlled demo, set these server-side environment variables:
 
 ```text
-Browser workbench ──POST /api/analyze──> Zod input bounds
-                                     ├── PostgreSQL AST inspection
-                                     ├── optional JSON plan inspection
-                                     └── optional gated Gemini hypotheses
-                   <── evidence report ──┘
-
-Browser localStorage <── explicit Save inputs locally
-Browser download     <── Export report
+GOOGLE_API_KEY=...
+AI_DEMO_CODE=...
+GOOGLE_MODEL=gemini-2.5-flash
 ```
 
-Analysis requests have size and per-minute limits. The server does not persist SQL, plans, AI results, or access codes. Saved inputs are local to the browser and can be removed from `/history`; browser data removal also deletes them. Reopening a saved input runs a fresh analysis. A report download contains the user's SQL. Anonymous history and public share APIs now return HTTP 410 to prevent exposure of existing legacy records. The old SQLite database remains in the repository and should be removed from a clean release after its data has been reviewed and safely archived.
+See [`.env.example`](.env.example) for the full example. The demo code gates requests; it is not a user account system. When a user opts in, their SQL, optional schema context, and plan summary are sent to Google. The server accepts at most three structured hypotheses and keeps only those tied to an existing finding. AI review does not write SQL for you or invent performance numbers. If the provider fails, the non-AI report still appears.
 
-## Deployment
+Do not enable the AI endpoint for unrestricted public traffic with only the current in-memory limit. A public service needs a distributed rate limiter, quotas, monitoring, and an identity or billing policy.
 
-Set the project root to `querysense/`, install with `npm ci`, and build with `npm run build`. No `DATABASE_URL` is required for the current application. Configure security monitoring, HTTPS, and a distributed limiter before opening paid AI review to the public. The current in-memory limit is per process and is not a global quota on serverless platforms. Plan content may include table names and filter literals; users should redact sensitive values before submission.
+## Where the data goes
 
-## Portfolio explanation
+- Analysis requests are validated and processed on the server, but QuerySense does not persist the SQL or plan in its application database.
+- **Save inputs locally** stores up to 25 input sets in this browser's local storage. Saved work is not synced across devices; clearing browser data removes it.
+- **Export report** downloads a Markdown file containing your SQL and findings. Treat that file as sensitive if the query contains private names or literals.
+- The workload CSV stays in the browser. Plans and SQL submitted for analysis still pass through the server, so redact sensitive literals before pasting them.
+- Legacy anonymous history and public sharing endpoints return HTTP 410; they do not expose the old stored records.
 
-“I built a PostgreSQL diagnostic workbench that separates static SQL analysis from actual planner evidence. It parses and bounds untrusted input, interprets JSON plan nodes, shows the limits of each recommendation, and turns findings into reproducible experiments. AI is optional, gated, and constrained to cite deterministic evidence rather than fabricate speedups.”
+## Implementation at a glance
+
+| Part | What it does |
+| --- | --- |
+| Next.js workbench | SQL input, plan input, visual report, candidate diff, local saved work |
+| `/api/analyze` | Bounds and validates requests with Zod; applies per-process request limits |
+| SQL inspector | Parses a single PostgreSQL `SELECT` and reports conservative structural findings |
+| Plan inspector | Reads pasted PostgreSQL JSON plans; distinguishes estimates from measured `ANALYZE` fields |
+| Optional Gemini review | Produces evidence-linked hypotheses behind a demo access code |
+
+The app uses Next.js 16, React 19, TypeScript, `node-sql-parser`, Zod, and an optional Google Gemini integration. Tests cover SQL inspection, plan handling, AI response checks, workload parsing, and selected UI behavior.
+
+## Deployment and limits
+
+Deploy from the **repository root**, using `npm ci` and `npm run build`. The nested `querysense/` directory is an older copy of the project, not the active app. The current workflow needs no `DATABASE_URL` or Prisma migration. The legacy SQLite database is still tracked in the repository; review and archive its contents before removing it from a future clean release.
+
+The current request limit lives in server memory, so it is not a global quota across serverless instances. Use HTTPS and production-grade abuse controls before exposing AI review publicly. SQL parsing supports the implemented PostgreSQL `SELECT` subset, not every dialect or statement. QuerySense cannot discover your existing indexes, verify plan provenance, prove two queries are equivalent, or benchmark a rewrite on its own.
+
+That boundary is deliberate: the useful output is a testable explanation, not an unsupported “100% faster” claim.
