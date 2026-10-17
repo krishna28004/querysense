@@ -1,18 +1,25 @@
-# Technical Decisions
+# QuerySense technical decisions
 
-This document outlines the rationale behind key engineering decisions made during the development of QuerySense.
+## Why a website instead of asking a chat model?
 
-## Q: "Why use AI for this? Can't you just run EXPLAIN ANALYZE on the database?"
-**A:** "EXPLAIN ANALYZE requires you to actually run the query against a populated database to get meaningful results. QuerySense shifts this left. It works entirely statically *before* the code is even committed. It catches structural anti-patterns without needing database access, acting as an educational tool for junior developers, not just a diagnostic tool for DBAs."
+SQL text alone does not expose table cardinality, data distribution, existing indexes, or observed runtime. QuerySense gives the developer a repeatable workflow: parse a read-only PostgreSQL query, inspect a real plan supplied by the developer, link findings to plan fields, and compare a candidate plan. The report separates static clues, planner estimates, and measured `EXPLAIN ANALYZE` data. AI can add only hypotheses that cite an existing finding ID.
 
-## Q: "Isn't the OpenAI call slow for a UI?"
-**A:** "We optimized the perceived performance by adding an animated execution timeline that shows the steps of the analysis. Next.js API Routes handle the stream/response efficiently, and the structured output format keeps the token count low. The total turnaround is usually under 3 seconds."
+## Why no automatic “optimized query”?
 
-## Q: "Why SQLite instead of Postgres?"
-**A:** "Speed of execution and portability. Using SQLite allowed us to self-contain the entire application without external database dependencies, meaning anyone can clone the repo and run it immediately without setting up Docker or a Postgres DB. However, because we used Prisma, migrating to Postgres is literally a one-line change in the `.env` file."
+Textual rewrites can change result semantics or regress performance on another workload. QuerySense instead offers an action and a verification step. Candidate SQL can be recorded and syntax-checked beside the baseline, but the application does not assert semantic equivalence or plan provenance. A developer checks result equality and repeats measured trials before applying any change. The application does not claim a speedup from static SQL or planner cost.
 
-## Q: "What happens if the LLM hallucinates a bad query?"
-**A:** "We mitigated this by strictly enforcing the output schema using Zod. Furthermore, the UI presents the optimized query alongside a detailed 'Reasoning' section. The goal isn't to auto-execute the query blindly, but to present the developer with actionable recommendations that they can review."
+## Why paste a plan rather than connect to the database?
 
-## Q: "Why Next.js 15?"
-**A:** "We leveraged Next.js App Router and Turbopack for rapid iteration. The polish comes from our strict design system using Tailwind v4 and Framer Motion micro-animations. We focused entirely on the core user flow, ensuring a seamless and fast developer experience."
+This avoids handling database credentials and executing untrusted SQL. The user runs `EXPLAIN (FORMAT JSON)` in their own client and may paste the result. `ANALYZE` is an explicit user choice because it executes the query. Plans may contain sensitive filter literals; the UI asks users to redact them. No plan is retained server-side.
+
+## Why optional, gated AI?
+
+Deterministic analysis must work without a provider key. The optional server-side Gemini call requires both an environment key and a demo access code, uses input limits and an abort signal, requests structured JSON, validates it with Zod, and discards hypotheses with unknown evidence IDs. Provider failure does not become a mocked success. In-process rate limits control a single deployment process; paid public AI would require distributed quotas, identity, monitoring, and a budget policy.
+
+## Why browser-local history?
+
+The previous anonymous SQLite history exposed every visitor's saved SQL. Current analysis is stateless; users explicitly save inputs in localStorage, up to 25 entries, and can export the report as Markdown. This does not provide cross-device sync. The old database remains locally for recovery, but public history and share endpoints return HTTP 410 and the database has been removed from future Git tracking.
+
+## What is “production ready” here?
+
+The deterministic app builds and runs without external services. A public deployment still needs hosting configuration, HTTPS, rate-limit infrastructure if AI is enabled, error monitoring, privacy policy decisions, and review of any historical SQLite data committed in Git. No claim of benchmarked SQL improvement or validated model output is made without real database/provider integration tests.

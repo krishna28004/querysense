@@ -39,15 +39,13 @@ interface SidebarProps {
   mobileOpen?: boolean;
   desktopCollapsed?: boolean;
   onToggle?: () => void;
-  onCloseMobile?: () => void;
 }
 
 export default function Sidebar({ 
   isMobile = false, 
   mobileOpen = false, 
   desktopCollapsed = false,
-  onToggle,
-  onCloseMobile
+  onToggle
 }: SidebarProps) {
   const pathname = usePathname();
 

@@ -1,91 +1,61 @@
-# QuerySense
+# QuerySense / Lab
 
-**An AI-assisted SQL performance analysis platform.**
+An evidence-led PostgreSQL query diagnosis workspace built with Next.js 16, React 19, TypeScript, `node-sql-parser`, Zod, and optional Google Gemini. The active app is this directory (`queryPilot/querysense`). The nested `querysense/` directory is a legacy duplicate and should not be used as the deployment root.
 
-## Short Overview
+## What works
 
-Developers often write inefficient SQL queries that lead to slow APIs, high database costs, poor scalability, and performance bottlenecks. QuerySense is an intelligent agent that analyzes SQL queries, detects structural bottlenecks, estimates performance risks, and recommends targeted optimizations *before* deployment.
+- Parse one PostgreSQL `SELECT` (including supported CTEs) and reject malformed, multi-statement, or mutating input.
+- Surface conservative structural findings such as wildcard projection, cross join, deep offset, and leading-wildcard search.
+- Read pasted PostgreSQL `EXPLAIN (FORMAT JSON)` plans. Distinguish estimated plans from `ANALYZE` plans, display the plan tree, and flag large row-estimate errors, filtered sequential scans, and disk-spilling sorts where their evidence fields exist.
+- Inspect more plan evidence per node, including loops, cost units, filters, index conditions, shared-buffer hits/reads, temp I/O, sort method/space, and hash batches when present in the supplied plan.
+- Import a `pg_stat_statements` CSV locally in the browser and rank query shapes by total time, mean time, call count, or shared block reads. The file is not uploaded or persisted; imported SQL may still contain sensitive text, so sanitize it before loading.
+- Provide an observation, action, and verification step for every finding. Record optional candidate SQL (syntax-checked) and paste a candidate plan to compare measured execution times or estimated planner costs. Export a Markdown report. Explicitly save up to 25 input sets in browser storage; nothing is written to the application database.
+- Optionally request a Gemini review. The server validates structured output, allows at most three hypotheses, and only keeps hypotheses that cite a finding ID. It does not generate SQL rewrites or performance numbers.
 
-## Problem Statement
+QuerySense does not execute SQL, connect to a target database, discover existing indexes, prove an index will help, verify that candidate SQL returns the same rows, verify plan provenance, or benchmark rewritten queries. A pasted `EXPLAIN ANALYZE` plan was measured by the user's PostgreSQL instance, not by QuerySense. PostgreSQL planner cost is an estimate in arbitrary units, not elapsed milliseconds.
 
-Bad queries cost organizations thousands of dollars and degrade user experience. By the time a query bottleneck is discovered in production through traditional profiling, the damage is already done. Identifying missing indexes, redundant joins, or full table scans requires deep DBA expertise that many development teams lack during the active coding phase.
+## Local setup
 
-## Solution
+Use Node.js 20.9+ and npm. From this directory:
 
-QuerySense shifts database performance analysis left. It acts as a static analysis tool that integrates directly into the developer workflow, catching structural anti-patterns and performance risks without needing direct database execution or populated tables.
+```bash
+npm ci
+npm run dev
+npm run typecheck
+npm run lint
+npm test
+npm run build
+```
 
-## Why QuerySense?
+No database setup or migration is needed for the current product. The `prisma/` directory and old analyzer components are legacy artifacts. Existing SQLite data is intentionally left intact but is no longer served by public endpoints.
 
-Unlike traditional database profiling tools that require executing queries against live data to uncover issues, QuerySense proactively analyzes your code as you write it. It bridges the gap between software engineering and database administration, ensuring that performance optimizations are a core part of the development lifecycle rather than an afterthought.
+The workbench is at `/editor`. A worked example is available in the UI, or at `/editor?sample=orders`. The example plan is illustrative; its numbers are fixture data. For a real query, run `EXPLAIN (FORMAT JSON) SELECT ...` in your own PostgreSQL client and paste the JSON. Use `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` only in a safe environment: `ANALYZE` executes the query. Check result equality and production-like data before deploying any rewrite or index.
 
-## Key Features
+## Optional AI review
 
-- **Instant Analysis**: Paste any SQL query and get a comprehensive, structured breakdown.
-- **AI Optimization**: Identifies missing indexes, redundant joins, and full table scans.
-- **Visual Diff Comparisons**: View side-by-side comparisons of your original query against the optimized version.
-- **Execution History**: Automatically saves analysis results for team review and knowledge sharing.
-- **Beautiful UI**: Highly responsive and intuitive dashboard designed for developer experience.
+Set `GOOGLE_API_KEY` and a strong `AI_DEMO_CODE` in server environment variables. `GOOGLE_MODEL` defaults to `gemini-2.5-flash`. Both the model key and access code stay server-side; users enter the demo code when opting in. The code is not saved to browser storage. When enabled, supplied SQL, optional schema text, and plan summary are sent to Google. If the provider is unavailable, the deterministic report still renders and AI shows as unavailable. There is no mocked provider response.
 
-## QueryVision™
-
-QueryVision™ is a visual intelligence layer that translates SQL execution plans into an interactive timeline. It dynamically breaks down the sequence of query operations to clarify database behavior. This visualization helps developers pinpoint bottlenecks—such as nested loops or missing indexes—and understand the technical rationale behind each AI-driven optimization.
+The access code and in-process request limits are suitable for a controlled demo on a single server. For a public production deployment with AI enabled, add a durable distributed rate limiter, quotas, abuse monitoring, and a proper identity/billing policy. Otherwise, leave AI unconfigured and use the core deterministic workflow.
 
 ## Architecture
 
-QuerySense relies on a hybrid rule engine combined with AI analysis. The frontend parses user input and handles syntax highlighting, while the backend utilizes structured LLM outputs via strict Zod schemas to guarantee precise JSON responses.
+```text
+Browser workbench ──POST /api/analyze──> Zod input bounds
+                                     ├── PostgreSQL AST inspection
+                                     ├── optional JSON plan inspection
+                                     └── optional gated Gemini hypotheses
+                   <── evidence report ──┘
 
-## Technology Stack
-
-- **Frontend**: Next.js 15 (App Router), TypeScript, Tailwind CSS v4, Framer Motion, Monaco Editor
-- **Backend**: Next.js API Routes, Google Gemini API (Structured Outputs)
-- **Database**: Prisma (SQLite local, PostgreSQL ready)
-
-## How It Works
-
-1. **Input**: Paste your raw SQL query into the Monaco-powered editor.
-2. **Analysis**: The intelligence engine parses the structure and identifies anti-patterns.
-3. **Recommendation**: QuerySense scores the performance risk and generates a heavily optimized query.
-4. **Review**: The developer reviews the optimization rationale and applies the updated SQL.
-
-## Use Cases
-
-- **Code Reviews**: Verify SQL queries in PRs to block dangerous or unoptimized code from merging.
-- **Educational Tool**: Help junior developers understand query execution plans and database indexes.
-- **Pre-Deployment Checks**: Ensure queries are performant before they ever reach a staging or production database.
-
-## Run Locally
-
-1. Clone the repository: `git clone https://github.com/krishna28004/querysense.git`
-2. Install dependencies: `npm install`
-3. Copy `.env.example` to `.env` and add your Gemini API Key.
-4. Setup database: `npx prisma db push`
-5. Start dev server: `npm run dev`
-
-## Project Structure
-
-```
-├── app/                  # Next.js app router pages and API
-├── components/           # Reusable UI components
-├── docs/                 # Documentation and architecture decisions
-├── prisma/               # Database schema and migrations
-└── public/               # Static assets
+Browser localStorage <── explicit Save inputs locally
+Browser download     <── Export report
 ```
 
-## Limitations
+Analysis requests have size and per-minute limits. The server does not persist SQL, plans, AI results, or access codes. Saved inputs are local to the browser and can be removed from `/history`; browser data removal also deletes them. Reopening a saved input runs a fresh analysis. A report download contains the user's SQL. Anonymous history and public share APIs now return HTTP 410 to prevent exposure of existing legacy records. The old SQLite database remains in the repository and should be removed from a clean release after its data has been reviewed and safely archived.
 
-- QuerySense performs static analysis and does not have access to live database statistics (like table cardinality), meaning recommendations are structural, not empirical.
-- Complex dialect-specific features may require manual review.
+## Deployment
 
-## Future Improvements
+Set the project root to `querysense/`, install with `npm ci`, and build with `npm run build`. No `DATABASE_URL` is required for the current application. Configure security monitoring, HTTPS, and a distributed limiter before opening paid AI review to the public. The current in-memory limit is per process and is not a global quota on serverless platforms. Plan content may include table names and filter literals; users should redact sensitive values before submission.
 
-- Direct integration with GitHub Actions to review PRs automatically.
-- Support for live database connections to run actual `EXPLAIN ANALYZE` commands for empirical validation.
-- Enhanced dialect support for MySQL, SQL Server, and Oracle.
+## Portfolio explanation
 
-## Contributing
-
-We welcome contributions! Please open an issue or submit a Pull Request. Make sure to follow the existing code style and ensure all type checks pass.
-
-## License
-
-This project is licensed under the MIT License.
+“I built a PostgreSQL diagnostic workbench that separates static SQL analysis from actual planner evidence. It parses and bounds untrusted input, interprets JSON plan nodes, shows the limits of each recommendation, and turns findings into reproducible experiments. AI is optional, gated, and constrained to cite deterministic evidence rather than fabricate speedups.”

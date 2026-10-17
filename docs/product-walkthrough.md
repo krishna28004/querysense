@@ -1,22 +1,10 @@
-# Product Walkthrough
+# QuerySense product walkthrough
 
-## The Context
-Developers frequently encounter performance bottlenecks where an API is timing out due to an unoptimized SQL query causing high CPU utilization. Bad queries degrade user experience and inflate infrastructure costs. Fixing them *before* they hit production is crucial.
+1. Open `/editor` and paste one PostgreSQL `SELECT`. The parser rejects invalid SQL, multiple statements, and DML/DDL. Use the worked example to explore the interface; its plan values are fabricated fixture data and are labeled accordingly.
+2. Run static analysis. A finding shows the exact observed pattern, why it may matter, a cautious next move, and how to validate it. Static inspection cannot know whether a query is actually slow.
+3. For a real diagnosis, run `EXPLAIN (FORMAT JSON) <query>` in your PostgreSQL client and paste the JSON. QuerySense renders the plan tree and checks supported signals such as row-estimate mismatch, filtered sequential scans, and disk-spilling sorts. `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` adds observed execution data but executes the query; use it only where safe.
+4. Change one variable in a safe environment. Optionally record the candidate SQL and paste its JSON plan. QuerySense parses the candidate SQL but cannot prove it returns the same rows or that a pasted plan belongs to it. Execution times are compared only when both plans contain measured times; otherwise planner cost is compared as an estimate. A single pair of measurements is not a benchmark; repeat trials and verify result equivalence.
+5. Optional AI review adds at most three hypotheses tied to existing finding IDs. It requires a demo access code and sends the supplied SQL, schema context, and baseline plan summary to the configured provider. Without the provider or valid access code, deterministic analysis remains available.
+6. Export the report as Markdown or explicitly save input SQL and plans in this browser. Reopening saved work runs a fresh analysis. No account, database connection, server-side query history, or public share link is involved.
 
-## The Introduction
-QuerySense is an AI-powered database query optimizer built for developers. This walkthrough demonstrates how it integrates into a typical development workflow to identify and resolve performance issues.
-
-## Execution
-Using the QuerySense Dashboard, a developer pastes a complex or slow SQL query into the Monaco Editor and clicks 'Analyze Query'. The intelligence engine immediately processes the syntax.
-
-## Insights & Analysis
-In seconds, QuerySense formats the code and identifies specific bottlenecks. For instance, it flags structural anti-patterns such as full table scans, missing indexes on specific tables (e.g., the `users` table), or the dangerous use of `SELECT *`. 
-
-## The Solution
-QuerySense does not just diagnose the problem; it provides an optimized version of the query. Developers can clearly see the differences using a side-by-side diff. Additionally, it provides an exact estimation of the performance risk, allowing for an informed decision before implementation.
-
-## History & Persistence
-Integrated with Prisma, every query analyzed is saved to a local history. This allows developers and teams to review past optimizations over time and track performance improvements.
-
-## Conclusion
-QuerySense leverages Next.js 15, Tailwind, and advanced AI models to provide a fast, intuitive, and highly effective tool for safeguarding databases from inefficient queries.
+The code path is `app/(app)/editor/page.tsx` → `app/api/analyze/route.ts` → `lib/diagnostics.ts`, `lib/plan-analysis.ts`, `lib/plan-comparison.ts`, and optionally `lib/ai-review.ts`. Tests live alongside these modules.
